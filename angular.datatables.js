@@ -2,7 +2,6 @@
  * avenger.datatables
  * created by Nicholas Recht on 5/26/2016
  * last updated: 9/28/2016
- * Plugin for angular-datatables
  */
 (function () {
 
