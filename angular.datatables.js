@@ -1,11 +1,54 @@
 /*
  * avenger.datatables
  * created by Nicholas Recht on 5/26/2016
- * last updated: 9/28/2016
+ * last updated: 10/12/2016
  */
 (function () {
 
     angular.module('avenger.datatables', [])
+    /*
+     * avRowCompiler service
+     * Handles the synchronization of compiling angular-bound rows for each datatable.
+     * Instead of compiling the rows when they are added (which doesn't necessarily happen during a digest cycle),
+     * multiple rows are queued up then compiled all together using the $timeout service. This guarentees they will
+     * be compiled during a digest cycle. 
+     */
+    .service("avRowCompiler", function ($timeout, $compile) {
+
+        var _intervalTime = 2; // ms
+        var _interval = false; 
+
+        var avRowCompiler = {
+            addRow: function (row, scope) {
+                row.style.visibility = "hidden"; // toggle visibility to get rid of the "flicker" effect you get otherwise
+                this._rows.push({ row: row, scope: scope });
+
+                // check if we already have another request to compile rows
+                if (!_interval) {
+
+                    _interval = true;
+                    $timeout(function () {
+
+                        // compile all rows that have been queued
+                        var _rowSet = avRowCompiler._rows;
+                        _rowSet.forEach(function (val) {
+                            val.row.style.visibility = "visible"; 
+                            $compile(angular.element(val.row))(val.scope);
+                        });
+
+                        // reset the array of rows
+                        avRowCompiler._rows = [];
+                        _interval = false;
+
+                    }, _intervalTime, true);
+                }
+            },
+            _rows: []
+        };
+
+        return avRowCompiler;
+    })
+    
     /*
      * av-datatable directive
      * Wrapper for a datatable that makes creating a datatable within the angular framework simpler. The directive will
@@ -70,7 +113,7 @@
      *  ** This feature is only fully supported with "static" datasets. Dynamically adding rows to the table will not add to the auto-complete boxes due to performance
      *     costs. The filtering should still function correctly however. 
      */
-    .directive("avDatatable", function ($compile, $parse) {
+    .directive("avDatatable", function ($compile, $parse, avRowCompiler) {
         return {
             restrict: 'A',
             scope: {
@@ -133,7 +176,8 @@
                     row.setAttribute("av-datatable-row", data.$$rowIndex);
                     row.setAttribute("rpt-expression", $scope.avDatatable);
 
-                    $compile(angular.element(row))(_pScope);
+                    avRowCompiler.addRow(row, _pScope); 
+                    //$compile(angular.element(row))(_pScope);
                 }
 
                 _options.columns = angular.copy($scope.dtColumns);
